@@ -1,9 +1,9 @@
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import BookingList from "@/components/bookings/BookingList";
+import ViewSlots from "@/components/clients/ViewSlots";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Booking list",
+  title: "Client Slots",
   description: "Manage booking slots for client",
 };
 
@@ -17,7 +17,7 @@ export default async function ClientSlotsPage({
   return (
     <div>
       <PageBreadcrumb pageTitle="Client Slots" />
-      <BookingList clientId={clientId} />
+      <ViewSlots clientId={clientId} />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
+import { useRouter } from "next/navigation";
 
 /* ================= TYPES ================= */
 
@@ -195,6 +196,7 @@ function ClientActions({
   onToggleStatus: (c: Client) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
 
   return (
     <div className="relative inline-block">
@@ -207,10 +209,13 @@ function ClientActions({
         onClose={() => setIsOpen(false)}
         className="w-40 p-2"
       >
-        <DropdownItem onItemClick={() => setIsOpen(false)}>
-          <Link href={`/admin/clients/${client._id}/slots`} className="w-full">
-            View
-          </Link>
+        <DropdownItem
+          onItemClick={() => {
+            router.push(`/admin/clients/${client._id}/slots`);
+            setIsOpen(false);
+          }}
+        >
+          View
         </DropdownItem>
 
         <DropdownItem

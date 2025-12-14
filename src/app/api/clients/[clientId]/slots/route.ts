@@ -9,7 +9,7 @@ import BookingSlot from "@/models/BookingSlot";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ clientId: string }> },
 ) {
   try {
     await connectDB();
@@ -18,7 +18,7 @@ export async function GET(
     if (!mongoose.Types.ObjectId.isValid(clientId)) {
       return NextResponse.json(
         { success: false, message: "Invalid client ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -29,7 +29,7 @@ export async function GET(
     console.error("GET slots error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to fetch slots" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -40,37 +40,68 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ clientId: string }> },
 ) {
   try {
     await connectDB();
     const { clientId } = await params;
 
-    const body = await req.json();
-    const { date, times } = body;
-
-    if (!date || !Array.isArray(times) || times.length === 0) {
+    if (!mongoose.Types.ObjectId.isValid(clientId)) {
       return NextResponse.json(
-        { success: false, message: "Date and times are required" },
-        { status: 400 }
+        { success: false, message: "Invalid client ID" },
+        { status: 400 },
       );
     }
 
-    const slot = await BookingSlot.create({
-      clientId,
-      date,
-      times: times.map((t: string) => ({ time: t }))
-    });
+    const body = await req.json();
+    const { startDate, days, times } = body;
 
-    return NextResponse.json(
-      { success: true, data: slot },
-      { status: 201 }
-    );
+    if (!startDate || !days || !Array.isArray(times) || times.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Invalid input data" },
+        { status: 400 },
+      );
+    }
+
+    const createdSlots = [];
+
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+
+      const dateStr = date.toISOString().split("T")[0];
+
+      // Prevent duplicate slot for same date
+      const existing = await BookingSlot.findOne({
+        clientId,
+        date: dateStr,
+      });
+
+      if (existing) continue;
+
+      const slot = await BookingSlot.create({
+        clientId,
+        date: dateStr,
+        times: times.map((time: string) => ({
+          time,
+          isBooked: false,
+          bookingId: null,
+        })),
+      });
+
+      createdSlots.push(slot);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Slots created successfully",
+      data: createdSlots,
+    });
   } catch (error) {
-    console.error("POST slot error:", error);
+    console.error("POST slots error:", error);
     return NextResponse.json(
-      { success: false, message: "Failed to create slot" },
-      { status: 500 }
+      { success: false, message: "Failed to create slots" },
+      { status: 500 },
     );
   }
 }

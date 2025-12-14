@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
-import Client from "@/models/Client"; 
+import Client from "@/models/Client";
 import Booking from "@/models/Booking";
 import BookingSlot from "@/models/BookingSlot";
 
@@ -11,7 +11,7 @@ import BookingSlot from "@/models/BookingSlot";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ clientId: string }> },
 ) {
   try {
     await connectDB();
@@ -20,19 +20,18 @@ export async function GET(
     if (!mongoose.Types.ObjectId.isValid(clientId)) {
       return NextResponse.json(
         { success: false, message: "Invalid client ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const bookings = await Booking.find({ clientId })
-  .sort({ createdAt: -1 });
+    const bookings = await Booking.find({ clientId }).sort({ createdAt: -1 });
 
     return NextResponse.json({ success: true, data: bookings });
   } catch (error) {
     console.error("GET bookings error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to fetch bookings" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -43,7 +42,7 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
+  { params }: { params: Promise<{ clientId: string }> },
 ) {
   try {
     await connectDB();
@@ -52,7 +51,7 @@ export async function POST(
     if (!mongoose.Types.ObjectId.isValid(clientId)) {
       return NextResponse.json(
         { success: false, message: "Invalid client ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -61,7 +60,7 @@ export async function POST(
     if (!clientExists) {
       return NextResponse.json(
         { success: false, message: "Client not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -75,7 +74,7 @@ export async function POST(
           success: false,
           message: "date, time and userPhone are required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -87,13 +86,13 @@ export async function POST(
           success: false,
           message: "No slots available for this date",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // 4️⃣ Check time exists
     const timeEntry = slotForDate.times.find(
-      (t: { time: string; isBooked: boolean }) => t.time === time
+      (t: { time: string; isBooked: boolean }) => t.time === time,
     );
     if (!timeEntry) {
       return NextResponse.json(
@@ -101,7 +100,7 @@ export async function POST(
           success: false,
           message: "Selected time does not exist for this date",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -112,11 +111,11 @@ export async function POST(
           success: false,
           message: "Selected time is already booked",
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
-    // 6️⃣ ATOMIC LOCK (final safety)
+    // 6️⃣ ATOMIC LOCK + bookingId placeholder
     const lockedSlot = await BookingSlot.findOneAndUpdate(
       {
         clientId,
@@ -131,9 +130,10 @@ export async function POST(
       {
         $set: {
           "times.$.isBooked": true,
+          "times.$.bookingId": null, // placeholder
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!lockedSlot) {
@@ -142,7 +142,7 @@ export async function POST(
           success: false,
           message: "Slot just got booked, please try another time",
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -158,15 +158,25 @@ export async function POST(
       status: "confirmed",
     });
 
-    return NextResponse.json(
-      { success: true, data: booking },
-      { status: 201 }
+    // 8️⃣ 🔥 SAME element update (guaranteed)
+    await BookingSlot.updateOne(
+      {
+        _id: lockedSlot._id,
+        "times.time": time,
+      },
+      {
+        $set: {
+          "times.$.bookingId": booking._id,
+        },
+      },
     );
+
+    return NextResponse.json({ success: true, data: booking }, { status: 201 });
   } catch (error) {
     console.error("POST booking error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to create booking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

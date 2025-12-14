@@ -8,7 +8,7 @@ import BookingSlot from "@/models/BookingSlot";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string; slotId: string }> }
+  { params }: { params: Promise<{ clientId: string; slotId: string }> },
 ) {
   try {
     await connectDB();
@@ -19,7 +19,7 @@ export async function GET(
     if (!slot) {
       return NextResponse.json(
         { success: false, message: "Slot not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -28,7 +28,7 @@ export async function GET(
     console.error("GET slot error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to fetch slot" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -38,33 +38,74 @@ export async function GET(
  */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string; slotId: string }> }
+  { params }: { params: Promise<{ clientId: string; slotId: string }> },
 ) {
   try {
     await connectDB();
     const { clientId, slotId } = await params;
 
-    const body = await req.json();
-
-    const updatedSlot = await BookingSlot.findOneAndUpdate(
-      { _id: slotId, clientId },
-      { $set: body },
-      { new: true }
-    );
-
-    if (!updatedSlot) {
+    // ✅ Validate ObjectIds
+    if (
+      !mongoose.Types.ObjectId.isValid(clientId) ||
+      !mongoose.Types.ObjectId.isValid(slotId)
+    ) {
       return NextResponse.json(
-        { success: false, message: "Slot not found" },
-        { status: 404 }
+        { success: false, message: "Invalid client or slot ID" },
+        { status: 400 },
       );
     }
 
-    return NextResponse.json({ success: true, data: updatedSlot });
+    const body = await req.json();
+    const { times } = body;
+
+    if (!Array.isArray(times) || times.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Times are required" },
+        { status: 400 },
+      );
+    }
+
+    // 🔒 Fetch existing slot
+    const slot = await BookingSlot.findOne({ _id: slotId, clientId });
+
+    if (!slot) {
+      return NextResponse.json(
+        { success: false, message: "Slot not found" },
+        { status: 404 },
+      );
+    }
+
+    // 🚫 BLOCK if any time is booked
+    const hasBookedTimes = slot.times.some((t: any) => t.isBooked);
+
+    if (hasBookedTimes) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "This slot has active bookings and cannot be modified",
+        },
+        { status: 409 },
+      );
+    }
+
+    // ✅ Safe update
+    slot.times = times.map((time: string) => ({
+      time,
+      isBooked: false,
+      bookingId: null,
+    }));
+
+    await slot.save();
+
+    return NextResponse.json({
+      success: true,
+      data: slot,
+    });
   } catch (error) {
     console.error("PUT slot error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to update slot" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -74,33 +115,46 @@ export async function PUT(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string; slotId: string }> }
+  { params }: { params: Promise<{ clientId: string; slotId: string }> },
 ) {
   try {
     await connectDB();
     const { clientId, slotId } = await params;
 
-    const deleted = await BookingSlot.findOneAndDelete({
-      _id: slotId,
-      clientId
-    });
+    // 🔒 Fetch slot
+    const slot = await BookingSlot.findOne({ _id: slotId, clientId });
 
-    if (!deleted) {
+    if (!slot) {
       return NextResponse.json(
         { success: false, message: "Slot not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
+    // 🚫 BLOCK if any time is booked
+    const hasBookedTimes = slot.times.some((t: any) => t.isBooked);
+
+    if (hasBookedTimes) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "This slot has active bookings and cannot be deleted",
+        },
+        { status: 409 },
+      );
+    }
+
+    await slot.deleteOne();
+
     return NextResponse.json({
       success: true,
-      message: "Slot deleted successfully"
+      message: "Slot deleted successfully",
     });
   } catch (error) {
     console.error("DELETE slot error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to delete slot" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

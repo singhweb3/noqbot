@@ -2,47 +2,74 @@
 
 import useSWR from "swr";
 
+/* ================= TYPES ================= */
+
 type WsrOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: any;
+  headers?: Record<string, string>;
 };
 
-const fetcher = async (url: string, options?: WsrOptions) => {
+type ApiError = Error & {
+  status?: number;
+};
+
+/* ================= FETCHER ================= */
+
+const fetcher = async <T = any>(
+  url: string,
+  options?: WsrOptions,
+): Promise<T> => {
   const res = await fetch(url, {
     method: options?.method || "GET",
     headers: {
       "Content-Type": "application/json",
+      ...(options?.headers || {}),
     },
     body: options?.body ? JSON.stringify(options.body) : undefined,
   });
 
-  if (!res.ok) {
-    throw new Error("Request failed");
+  let data: any = null;
+
+  try {
+    data = await res.json();
+  } catch {
+    // response has no JSON body
   }
 
-  return res.json();
+  if (!res.ok) {
+    const error: ApiError = new Error(data?.message || "Request failed");
+    error.status = res.status;
+    throw error;
+  }
+
+  return data;
 };
 
-/**
- * GET (hook)
- */
-export function useWsr<T>(url: string) {
-  const { data, error, isLoading, mutate } = useSWR<T>(url, fetcher);
+/* ================= GET HOOK ================= */
+
+export function useWsr<T>(url: string | null) {
+  const { data, error, isLoading, mutate } = useSWR<T>(url, fetcher, {
+    // 🔥 IMPORTANT: STOP infinite retry loops
+    shouldRetryOnError: false,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    errorRetryCount: 0,
+  });
 
   return {
     data,
     loading: isLoading,
-    error,
+    error: error as ApiError | undefined,
     refetch: mutate,
   };
 }
 
-/**
- * MUTATION (POST / PUT / DELETE)
- */
+/* ================= MUTATION ================= */
+
 export async function wsr<T = any>(
   url: string,
   options?: WsrOptions,
 ): Promise<T> {
-  return fetcher(url, options);
+  return fetcher<T>(url, options);
 }
