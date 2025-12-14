@@ -30,28 +30,55 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    subItems: [{ name: "Ecommerce", path: "/", pro: false }],
+    subItems: [{ name: "Overview", path: "/", pro: false }],
+  },
+
+  // ⭐ NoQBot Items Added Below
+  {
+    icon: <UserCircleIcon />,
+    name: "Clients",
+    path: "/admin/clients",
   },
   {
     icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
+    name: "Bookings",
+    path: "/admin/bookings",
+  },
+  {
+    icon: <ListIcon />,
+    name: "Slots",
+    path: "/admin/slots",
+  },
+  {
+    icon: <BoxCubeIcon />,
+    name: "Flows",
+    path: "/admin/flows",
   },
   {
     icon: <UserCircleIcon />,
-    name: "User Profile",
-    path: "/profile",
+    name: "Users",
+    path: "/admin/users",
+  },
+  {
+    icon: <PageIcon />,
+    name: "Settings",
+    path: "/admin/settings",
   },
 
+  // (Optional: Keep existing TailAdmin demo items below)
   {
     name: "Forms",
     icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
+    subItems: [
+      { name: "Form Elements", path: "/form-elements", pro: false },
+    ],
   },
   {
     name: "Tables",
     icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
+    subItems: [
+      { name: "Basic Tables", path: "/basic-tables", pro: false },
+    ],
   },
   {
     name: "Pages",
@@ -62,6 +89,44 @@ const navItems: NavItem[] = [
     ],
   },
 ];
+
+
+// const navItems: NavItem[] = [
+//   {
+//     icon: <GridIcon />,
+//     name: "Dashboard",
+//     subItems: [{ name: "Ecommerce", path: "/", pro: false }],
+//   },
+//   {
+//     icon: <CalenderIcon />,
+//     name: "Calendar",
+//     path: "/calendar",
+//   },
+//   {
+//     icon: <UserCircleIcon />,
+//     name: "User Profile",
+//     path: "/profile",
+//   },
+
+//   {
+//     name: "Forms",
+//     icon: <ListIcon />,
+//     subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
+//   },
+//   {
+//     name: "Tables",
+//     icon: <TableIcon />,
+//     subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
+//   },
+//   {
+//     name: "Pages",
+//     icon: <PageIcon />,
+//     subItems: [
+//       { name: "Blank Page", path: "/blank", pro: false },
+//       { name: "404 Error", path: "/error-404", pro: false },
+//     ],
+//   },
+// ];
 
 const othersItems: NavItem[] = [
   {
