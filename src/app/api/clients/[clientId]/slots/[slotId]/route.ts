@@ -2,9 +2,10 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import BookingSlot from "@/models/BookingSlot";
+import { requireAuth } from "@/lib/api-auth";
 
 /**
- * GET single slot
+ * GET single slot (Public – Bot Safe)
  */
 export async function GET(
   req: NextRequest,
@@ -13,6 +14,16 @@ export async function GET(
   try {
     await connectDB();
     const { clientId, slotId } = await params;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(clientId) ||
+      !mongoose.Types.ObjectId.isValid(slotId)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid client or slot ID" },
+        { status: 400 },
+      );
+    }
 
     const slot = await BookingSlot.findOne({ _id: slotId, clientId });
 
@@ -23,7 +34,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: slot });
+    return NextResponse.json({ success: true, data: slot }, { status: 200 });
   } catch (error) {
     console.error("GET slot error:", error);
     return NextResponse.json(
@@ -34,17 +45,21 @@ export async function GET(
 }
 
 /**
- * PUT update slot times (safe)
+ * PUT update slot times (Admin only – Safe)
  */
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ clientId: string; slotId: string }> },
 ) {
   try {
+    /* ================= AUTH ================= */
+    const auth = await requireAuth(req, ["super_admin", "client_admin"]);
+    if (!auth.ok) return auth.response;
+
     await connectDB();
     const { clientId, slotId } = await params;
 
-    // ✅ Validate ObjectIds
+    /* ================= PARAM VALIDATION ================= */
     if (
       !mongoose.Types.ObjectId.isValid(clientId) ||
       !mongoose.Types.ObjectId.isValid(slotId)
@@ -58,6 +73,7 @@ export async function PUT(
     const body = await req.json();
     const { times } = body;
 
+    /* ================= BODY VALIDATION ================= */
     if (!Array.isArray(times) || times.length === 0) {
       return NextResponse.json(
         { success: false, message: "Times are required" },
@@ -65,7 +81,18 @@ export async function PUT(
       );
     }
 
-    // 🔒 Fetch existing slot
+    const uniqueTimes = Array.from(
+      new Set(times.filter((t) => typeof t === "string" && t.trim())),
+    );
+
+    if (uniqueTimes.length === 0) {
+      return NextResponse.json(
+        { success: false, message: "Invalid slot times" },
+        { status: 400 },
+      );
+    }
+
+    /* ================= FETCH SLOT ================= */
     const slot = await BookingSlot.findOne({ _id: slotId, clientId });
 
     if (!slot) {
@@ -75,7 +102,7 @@ export async function PUT(
       );
     }
 
-    // 🚫 BLOCK if any time is booked
+    /* ================= SAFETY CHECK ================= */
     const hasBookedTimes = slot.times.some((t: any) => t.isBooked);
 
     if (hasBookedTimes) {
@@ -88,8 +115,8 @@ export async function PUT(
       );
     }
 
-    // ✅ Safe update
-    slot.times = times.map((time: string) => ({
+    /* ================= UPDATE ================= */
+    slot.times = uniqueTimes.map((time: string) => ({
       time,
       isBooked: false,
       bookingId: null,
@@ -97,10 +124,7 @@ export async function PUT(
 
     await slot.save();
 
-    return NextResponse.json({
-      success: true,
-      data: slot,
-    });
+    return NextResponse.json({ success: true, data: slot }, { status: 200 });
   } catch (error) {
     console.error("PUT slot error:", error);
     return NextResponse.json(
@@ -111,17 +135,32 @@ export async function PUT(
 }
 
 /**
- * DELETE slot (date)
+ * DELETE slot (Admin only – Safe)
  */
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ clientId: string; slotId: string }> },
 ) {
   try {
+    /* ================= AUTH ================= */
+    const auth = await requireAuth(req, ["super_admin", "client_admin"]);
+    if (!auth.ok) return auth.response;
+
     await connectDB();
     const { clientId, slotId } = await params;
 
-    // 🔒 Fetch slot
+    /* ================= PARAM VALIDATION ================= */
+    if (
+      !mongoose.Types.ObjectId.isValid(clientId) ||
+      !mongoose.Types.ObjectId.isValid(slotId)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid client or slot ID" },
+        { status: 400 },
+      );
+    }
+
+    /* ================= FETCH ================= */
     const slot = await BookingSlot.findOne({ _id: slotId, clientId });
 
     if (!slot) {
@@ -131,7 +170,7 @@ export async function DELETE(
       );
     }
 
-    // 🚫 BLOCK if any time is booked
+    /* ================= SAFETY CHECK ================= */
     const hasBookedTimes = slot.times.some((t: any) => t.isBooked);
 
     if (hasBookedTimes) {
@@ -146,10 +185,10 @@ export async function DELETE(
 
     await slot.deleteOne();
 
-    return NextResponse.json({
-      success: true,
-      message: "Slot deleted successfully",
-    });
+    return NextResponse.json(
+      { success: true, message: "Slot deleted successfully" },
+      { status: 200 },
+    );
   } catch (error) {
     console.error("DELETE slot error:", error);
     return NextResponse.json(

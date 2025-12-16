@@ -79,15 +79,19 @@ export default function BookingDetailsModal({
         Booking Details
       </h3>
 
-      {loading && <p className="mt-4">Loading...</p>}
+      {loading && (
+        <p className="mt-4 text-gray-800 dark:text-white/90">Loading...</p>
+      )}
 
       {error && (
-        <p className="text-error-500 mt-4">Failed to load booking details</p>
+        <p className="text-error-500 mt-4 text-gray-800 dark:text-white/90">
+          Failed to load booking details
+        </p>
       )}
 
       {booking && (
         <>
-          <div className="mt-4 space-y-2 text-sm">
+          <div className="mt-4 space-y-2 text-sm text-gray-800 dark:text-white/90">
             <p>
               <strong>Name:</strong> {booking.userName}
             </p>

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { seedSuperAdmin } from "@/lib/seedSuperAdmin";
 
 const MONGODB_URI = process.env.MONGODB_URI as string;
 
@@ -21,14 +22,21 @@ if (!global._mongoose) {
 }
 
 export async function connectDB() {
-  const cached = global._mongoose; // ✅ Now guaranteed to exist
+  const cached = global._mongoose;
 
   if (cached.conn) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI).then((m) => m);
+    cached.promise = mongoose.connect(MONGODB_URI).then(async (m) => {
+      console.log("✅ MongoDB connected");
+
+      // 🔑 Seed Super Admin ONCE
+      await seedSuperAdmin();
+
+      return m;
+    });
   }
 
   cached.conn = await cached.promise;

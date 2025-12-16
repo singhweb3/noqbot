@@ -107,7 +107,9 @@ export default function ViewSlots({ clientId }: { clientId: string }) {
         {loading ? (
           <p>Loading...</p>
         ) : slots.length === 0 ? (
-          <p>No slots created yet</p>
+          <p className="text-base text-gray-800 dark:text-white/90">
+            No slots created yet
+          </p>
         ) : (
           <div className="space-y-4">
             {slots.map((slot) => (
@@ -116,7 +118,9 @@ export default function ViewSlots({ clientId }: { clientId: string }) {
                 className="rounded-lg border p-4 dark:border-gray-800"
               >
                 <div className="mb-3 flex items-center justify-between">
-                  <p className="font-medium">{slot.date}</p>
+                  <p className="text-base font-medium text-gray-800 dark:text-white/90">
+                    {slot.date}
+                  </p>
 
                   <SlotActions
                     onEdit={() => handleEditSlot(slot)}
@@ -310,7 +314,7 @@ function SlotActions({
             onDelete();
             setIsOpen(false);
           }}
-          className="text-red-600"
+          className="text-red-600 hover:text-red-600 dark:text-red-600 dark:hover:text-red-600"
         >
           Delete
         </DropdownItem>
