@@ -9,7 +9,7 @@ export const ROLE_ACCESS: Record<UserRole, string[]> = {
 
   client_admin: ["/dashboard", "/bookings", "/slots"],
 
-  staff: ["/dashboard", "/bookings"],
+  staff: ["/slots", "/bookings"],
 };
 
 export function canAccessPath(role: UserRole, pathname: string): boolean {

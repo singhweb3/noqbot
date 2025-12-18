@@ -53,7 +53,11 @@ export async function PUT(
 ) {
   try {
     /* ================= AUTH ================= */
-    const auth = await requireAuth(req, ["super_admin", "client_admin"]);
+    const auth = await requireAuth(req, [
+      "super_admin",
+      "client_admin",
+      "staff",
+    ]);
     if (!auth.ok) return auth.response;
 
     await connectDB();

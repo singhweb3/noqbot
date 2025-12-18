@@ -3,14 +3,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Booking from "@/models/Booking";
 import BookingSlot from "@/models/BookingSlot";
+import { requireAuth } from "@/lib/api-auth";
 
+/**
+ * PUT /api/clients/[clientId]/bookings/[bookingId]/reschedule
+ * Reschedule booking
+ * ✅ super_admin + client_admin only
+ */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ clientId: string; bookingId: string }> }
+  { params }: { params: Promise<{ clientId: string; bookingId: string }> },
 ) {
   try {
+    /* ================= AUTH ================= */
+    const auth = await requireAuth(req, ["super_admin", "client_admin"]);
+    if (!auth.ok) return auth.response;
+
     await connectDB();
     const { clientId, bookingId } = await params;
+
+    // ✅ Validate IDs
+    if (
+      !mongoose.Types.ObjectId.isValid(clientId) ||
+      !mongoose.Types.ObjectId.isValid(bookingId)
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid ID" },
+        { status: 400 },
+      );
+    }
 
     const body = await req.json();
     const { date, time } = body;
@@ -18,7 +39,7 @@ export async function PUT(
     if (!date || !time) {
       return NextResponse.json(
         { success: false, message: "date and time are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -32,7 +53,7 @@ export async function PUT(
     if (!booking) {
       return NextResponse.json(
         { success: false, message: "Booking not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -51,15 +72,16 @@ export async function PUT(
       {
         $set: {
           "times.$.isBooked": true,
+          "times.$.bookingId": booking._id,
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!newSlot) {
       return NextResponse.json(
         { success: false, message: "New slot not available" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -72,13 +94,15 @@ export async function PUT(
       {
         $set: {
           "times.$.isBooked": false,
+          "times.$.bookingId": null,
         },
-      }
+      },
     );
 
     // 4️⃣ Update booking
     booking.slotId = newSlot._id;
     booking.selectedTime = time;
+    booking.date = date;
     booking.status = "confirmed";
     await booking.save();
 
@@ -91,7 +115,7 @@ export async function PUT(
     console.error("Reschedule booking error:", error);
     return NextResponse.json(
       { success: false, message: "Failed to reschedule booking" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

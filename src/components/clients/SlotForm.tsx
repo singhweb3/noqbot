@@ -5,6 +5,7 @@ import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { wsr } from "@/utils/wsr";
+import { useWsrMutation } from "@/utils/useWsrMutation";
 
 interface SlotTime {
   _id?: string;
@@ -42,11 +43,12 @@ export function SlotForm({
     slot ? slot.times.map((t) => t.time).join(", ") : "",
   );
 
-  const [saving, setSaving] = useState(false);
+  // const [saving, setSaving] = useState(false);
 
   const [dateError, setDateError] = useState(false);
   const [daysError, setDaysError] = useState(false);
   const [timesError, setTimesError] = useState(false);
+  const { mutate, loading: saving, errorMsg } = useWsrMutation();
 
   /* ================= HANDLERS ================= */
 
@@ -91,13 +93,12 @@ export function SlotForm({
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean);
+    let res;
 
     try {
-      setSaving(true);
-
       if (slot) {
         // ✅ EDIT SLOT (single date)
-        await wsr(`/api/clients/${clientId}/slots/${slot._id}`, {
+        res = await mutate(`/api/clients/${clientId}/slots/${slot._id}`, {
           method: "PUT",
           body: {
             times: timeArray,
@@ -105,8 +106,8 @@ export function SlotForm({
         });
       } else {
         // ✅ CREATE SLOTS (bulk days)
-        await wsr(`/api/clients/${clientId}/slots`, {
-          method: "POST",
+        res = await mutate(`/api/clients/${clientId}/slots`, {
+          method: "PUT",
           body: {
             startDate,
             days: Number(days),
@@ -115,9 +116,10 @@ export function SlotForm({
         });
       }
 
+      if (!res) return;
+
       onSuccess();
     } finally {
-      setSaving(false);
     }
   };
 
@@ -187,6 +189,11 @@ export function SlotForm({
             hint={timesError ? "At least one time is required." : ""}
           />
         </div>
+        {errorMsg && (
+          <p className="mt-4 text-sm text-red-600 dark:text-red-500">
+            Error: {errorMsg}
+          </p>
+        )}
       </div>
 
       <div className="mt-6 flex justify-end gap-2">

@@ -216,11 +216,19 @@ function ClientActions({
       >
         <DropdownItem
           onItemClick={() => {
+            router.push(`/admin/clients/${client._id}/bookings`);
+            setIsOpen(false);
+          }}
+        >
+          Bookings
+        </DropdownItem>
+        <DropdownItem
+          onItemClick={() => {
             router.push(`/admin/clients/${client._id}/slots`);
             setIsOpen(false);
           }}
         >
-          View
+          Slots
         </DropdownItem>
 
         <DropdownItem

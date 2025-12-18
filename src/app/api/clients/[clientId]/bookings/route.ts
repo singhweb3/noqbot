@@ -4,16 +4,37 @@ import { connectDB } from "@/lib/db";
 import Client from "@/models/Client";
 import Booking from "@/models/Booking";
 import BookingSlot from "@/models/BookingSlot";
+import { requireAuth } from "@/lib/api-auth";
+
+function isPastSlot(date: string, time: string) {
+  const now = new Date();
+
+  // slot datetime (local time)
+  const [hours, minutes] = time.split(":").map(Number);
+  const slotDateTime = new Date(date);
+  slotDateTime.setHours(hours, minutes, 0, 0);
+
+  return slotDateTime <= now;
+}
 
 /**
  * GET /api/clients/[clientId]/bookings
- * List all bookings (Admin)
+ * List all bookings
+ * ✅ Any logged-in user
  */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ clientId: string }> },
 ) {
   try {
+    /* ================= AUTH ================= */
+    const auth = await requireAuth(req, [
+      "super_admin",
+      "client_admin",
+      "staff",
+    ]);
+    if (!auth.ok) return auth.response;
+
     await connectDB();
     const { clientId } = await params;
 
@@ -24,9 +45,25 @@ export async function GET(
       );
     }
 
-    const bookings = await Booking.find({ clientId }).sort({ createdAt: -1 });
+    /* ================= FILTER ================= */
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get("date");
 
-    return NextResponse.json({ success: true, data: bookings });
+    const query: any = { clientId };
+
+    if (date) {
+      query.date = date;
+    }
+
+    const bookings = await Booking.find(query).sort({
+      date: 1,
+      selectedTime: 1,
+    });
+
+    return NextResponse.json(
+      { success: true, data: bookings },
+      { status: 200 },
+    );
   } catch (error) {
     console.error("GET bookings error:", error);
     return NextResponse.json(
@@ -38,13 +75,22 @@ export async function GET(
 
 /**
  * POST /api/clients/[clientId]/bookings
- * Robust booking with clear error handling
+ * Create booking
+ * ✅ super_admin + client_admin only
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ clientId: string }> },
 ) {
   try {
+    /* ================= AUTH ================= */
+    const auth = await requireAuth(req, [
+      "super_admin",
+      "client_admin",
+      "staff",
+    ]);
+    if (!auth.ok) return auth.response;
+
     await connectDB();
     const { clientId } = await params;
 
@@ -78,14 +124,19 @@ export async function POST(
       );
     }
 
-    // 3️⃣ Check slot exists for date
+    // 2.5️⃣ ⛔ Time validation (NEW)
+    if (isPastSlot(date, time)) {
+      return NextResponse.json(
+        { success: false, message: "Cannot book a past time slot" },
+        { status: 400 },
+      );
+    }
+
+    // 3️⃣ Check slot exists
     const slotForDate = await BookingSlot.findOne({ clientId, date });
     if (!slotForDate) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "No slots available for this date",
-        },
+        { success: false, message: "No slots available for this date" },
         { status: 404 },
       );
     }
@@ -96,41 +147,30 @@ export async function POST(
     );
     if (!timeEntry) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Selected time does not exist for this date",
-        },
+        { success: false, message: "Selected time does not exist" },
         { status: 400 },
       );
     }
 
-    // 5️⃣ Check if already booked
+    // 5️⃣ Already booked?
     if (timeEntry.isBooked) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Selected time is already booked",
-        },
+        { success: false, message: "Selected time is already booked" },
         { status: 409 },
       );
     }
 
-    // 6️⃣ ATOMIC LOCK + bookingId placeholder
+    // 6️⃣ Atomic lock
     const lockedSlot = await BookingSlot.findOneAndUpdate(
       {
         clientId,
         date,
-        times: {
-          $elemMatch: {
-            time,
-            isBooked: false,
-          },
-        },
+        times: { $elemMatch: { time, isBooked: false } },
       },
       {
         $set: {
           "times.$.isBooked": true,
-          "times.$.bookingId": null, // placeholder
+          "times.$.bookingId": null,
         },
       },
       { new: true },
@@ -158,17 +198,10 @@ export async function POST(
       status: "confirmed",
     });
 
-    // 8️⃣ 🔥 SAME element update (guaranteed)
+    // 8️⃣ Link bookingId
     await BookingSlot.updateOne(
-      {
-        _id: lockedSlot._id,
-        "times.time": time,
-      },
-      {
-        $set: {
-          "times.$.bookingId": booking._id,
-        },
-      },
+      { _id: lockedSlot._id, "times.time": time },
+      { $set: { "times.$.bookingId": booking._id } },
     );
 
     return NextResponse.json({ success: true, data: booking }, { status: 201 });

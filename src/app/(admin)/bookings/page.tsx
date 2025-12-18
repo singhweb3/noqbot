@@ -1,23 +1,17 @@
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import BookingList from "@/components/bookings/BookingList";
+import NoAdminBookings from "@/components/bookings/NotAdminBookings";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Booking list",
-  description: "Manage booking slots for client",
+  description: "Manage booking for client",
 };
 
-export default async function ClientSlotsPage({
-  params,
-}: {
-  params: Promise<{ clientId: string }>;
-}) {
-  const { clientId } = await params;
-
+export default async function ClientBookingPage() {
   return (
     <div>
-      <PageBreadcrumb pageTitle="Client Slots" />
-      <BookingList clientId={clientId} />
+      <PageBreadcrumb pageTitle="Client Booking" />
+      <NoAdminBookings />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { Modal } from "@/components/ui/modal";
-import { wsr } from "@/utils/wsr";
+import { useWsrMutation } from "@/utils/useWsrMutation";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -28,18 +28,19 @@ export default function BookingModal({
 }: BookingModalProps) {
   const [userName, setUserName] = useState("");
   const [userPhone, setUserPhone] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const [nameError, setNameError] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
 
+  // ✅ SAME hook you already use elsewhere
+  const { mutate, loading: saving, errorMsg } = useWsrMutation();
+
   const handleConfirm = async () => {
     let hasError = false;
 
-    const nameRegex = /[a-zA-Z]/; // must contain letters
-    const phoneRegex = /^\d{10,15}$/; // numbers only
+    const nameRegex = /[a-zA-Z]/;
+    const phoneRegex = /^\d{10,15}$/;
 
-    /* Name validation */
     if (!userName.trim() || !nameRegex.test(userName)) {
       setNameError(true);
       hasError = true;
@@ -47,7 +48,6 @@ export default function BookingModal({
       setNameError(false);
     }
 
-    /* Phone validation */
     if (!phoneRegex.test(userPhone)) {
       setPhoneError(true);
       hasError = true;
@@ -57,24 +57,20 @@ export default function BookingModal({
 
     if (hasError) return;
 
-    try {
-      setSaving(true);
+    const ok = await mutate(`/api/clients/${clientId}/bookings`, {
+      method: "POST",
+      body: {
+        date,
+        time,
+        userName: userName.trim(),
+        userPhone: userPhone.trim(),
+        source: "manual",
+      },
+    });
 
-      await wsr(`/api/clients/${clientId}/bookings`, {
-        method: "POST",
-        body: {
-          date,
-          time,
-          userName: userName.trim(),
-          userPhone: userPhone.trim(),
-          source: "manual",
-        },
-      });
-
+    if (ok) {
       onSuccess();
       onClose();
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -101,7 +97,6 @@ export default function BookingModal({
           <Label>Customer Name</Label>
           <Input
             placeholder="Customer name"
-            defaultValue={userName}
             onChange={(e) => {
               setUserName(e.target.value);
               setNameError(false);
@@ -117,7 +112,6 @@ export default function BookingModal({
           <Label>Mobile Number</Label>
           <Input
             placeholder="Mobile number"
-            defaultValue={userPhone}
             onChange={(e) => {
               setUserPhone(e.target.value);
               setPhoneError(false);
@@ -126,6 +120,11 @@ export default function BookingModal({
             hint={phoneError ? "Enter a valid numeric mobile number." : ""}
           />
         </div>
+
+        {/* ✅ API error shown automatically */}
+        {errorMsg && (
+          <p className="text-sm text-red-600 dark:text-red-500">{errorMsg}</p>
+        )}
       </div>
 
       {/* Footer */}

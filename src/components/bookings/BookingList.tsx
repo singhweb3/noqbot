@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useWsr, wsr } from "@/utils/wsr";
 import ComponentCard from "@/components/common/ComponentCard";
 import Button from "@/components/ui/button/Button";
@@ -8,6 +8,10 @@ import Badge from "@/components/ui/badge/Badge";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
 import BookingDetailsModal from "@/components/bookings/BookingDetailsModal";
+import { Dropdown } from "@/components/ui/dropdown/Dropdown";
+import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
+import { MoreDotIcon } from "@/icons";
+import { useWsrMutation } from "@/utils/useWsrMutation";
 
 /* ================= TYPES ================= */
 
@@ -24,8 +28,18 @@ interface Booking {
 /* ================= COMPONENT ================= */
 
 export default function BookingList({ clientId }: { clientId: string }) {
+  /* ================= FILTER ================= */
+  const getToday = () => {
+    const today = new Date();
+    return today.toISOString().split("T")[0]; // YYYY-MM-DD
+  };
+
+  const [filterDate, setFilterDate] = useState(getToday);
+
   const { data, loading, refetch } = useWsr<{ data: Booking[] }>(
-    `/api/clients/${clientId}/bookings`,
+    filterDate
+      ? `/api/clients/${clientId}/bookings?date=${filterDate}`
+      : `/api/clients/${clientId}/bookings`,
   );
 
   const bookings = data?.data || [];
@@ -35,7 +49,9 @@ export default function BookingList({ clientId }: { clientId: string }) {
 
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
-  const [processing, setProcessing] = useState(false);
+
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const { mutate, loading: processing, errorMsg } = useWsrMutation();
 
   /* ================= HANDLERS ================= */
 
@@ -52,20 +68,18 @@ export default function BookingList({ clientId }: { clientId: string }) {
   const confirmCancel = async () => {
     if (!bookingToCancel) return;
 
-    try {
-      setProcessing(true);
+    const ok = await mutate(
+      `/api/clients/${clientId}/bookings/${bookingToCancel._id}/cancel`,
+      {
+        method: "PUT",
+      },
+    );
 
-      await wsr(
-        `/api/clients/${clientId}/bookings/${bookingToCancel._id}/cancel`,
-        { method: "POST" },
-      );
+    if (!ok) return;
 
-      refetch();
-    } finally {
-      setProcessing(false);
-      setBookingToCancel(null);
-      cancelModal.closeModal();
-    }
+    refetch();
+    setBookingToCancel(null);
+    cancelModal.closeModal();
   };
 
   /* ================= RENDER ================= */
@@ -73,12 +87,50 @@ export default function BookingList({ clientId }: { clientId: string }) {
   return (
     <>
       <ComponentCard title="Bookings">
+        {/* ================= FILTER BAR ================= */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {filterDate ? `Showing bookings for ${filterDate}` : "All bookings"}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Hidden date input */}
+            <input
+              ref={dateInputRef}
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="sr-only"
+            />
+
+            {/* Visible button */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => dateInputRef.current?.showPicker()}
+            >
+              {filterDate || "Select Date"}
+            </Button>
+
+            {filterDate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setFilterDate("")}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* ================= TABLE ================= */}
         {loading ? (
           <p>Loading...</p>
         ) : bookings.length === 0 ? (
           <p>No bookings found</p>
         ) : (
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse text-gray-800 dark:text-gray-300">
             <thead>
               <tr className="border-b text-left">
                 <th className="py-2">Date</th>
@@ -117,24 +169,12 @@ export default function BookingList({ clientId }: { clientId: string }) {
                     </Badge>
                   </td>
 
-                  <td className="space-x-2 py-2 text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openDetails(booking)}
-                    >
-                      View
-                    </Button>
-
-                    {booking.status === "confirmed" && (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => openCancelConfirm(booking)}
-                      >
-                        Cancel
-                      </Button>
-                    )}
+                  <td className="py-2 text-right">
+                    <BookingActions
+                      booking={booking}
+                      onView={openDetails}
+                      onCancel={openCancelConfirm}
+                    />
                   </td>
                 </tr>
               ))}
@@ -178,6 +218,11 @@ export default function BookingList({ clientId }: { clientId: string }) {
           </strong>
           ?
         </p>
+        {errorMsg && (
+          <p className="mt-2 text-sm text-red-600 dark:text-red-500">
+            {errorMsg}
+          </p>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <Button size="sm" variant="outline" onClick={cancelModal.closeModal}>
@@ -195,5 +240,54 @@ export default function BookingList({ clientId }: { clientId: string }) {
         </div>
       </Modal>
     </>
+  );
+}
+
+/* ================= BOOKING ACTIONS ================= */
+
+function BookingActions({
+  booking,
+  onView,
+  onCancel,
+}: {
+  booking: Booking;
+  onView: (b: Booking) => void;
+  onCancel: (b: Booking) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <button onClick={() => setIsOpen((v) => !v)} className="dropdown-toggle">
+        <MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+      </button>
+
+      <Dropdown
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        className="w-40 p-2"
+      >
+        <DropdownItem
+          onItemClick={() => {
+            onView(booking);
+            setIsOpen(false);
+          }}
+        >
+          View
+        </DropdownItem>
+
+        {booking.status === "confirmed" && (
+          <DropdownItem
+            onItemClick={() => {
+              onCancel(booking);
+              setIsOpen(false);
+            }}
+            className="text-red-600 hover:text-red-600 dark:text-red-600 dark:hover:text-red-600"
+          >
+            Cancel
+          </DropdownItem>
+        )}
+      </Dropdown>
+    </div>
   );
 }

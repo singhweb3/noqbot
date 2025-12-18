@@ -123,7 +123,7 @@ export default function BookingDetailsModal({
           </div>
 
           {/* ================= ACTIONS ================= */}
-          <div className="mt-6 flex justify-end gap-2">
+          {/* <div className="mt-6 flex justify-end gap-2">
             {!isCancelled && (
               <>
                 <Button
@@ -138,7 +138,7 @@ export default function BookingDetailsModal({
                 </Button>
               </>
             )}
-          </div>
+          </div> */}
         </>
       )}
     </Modal>
