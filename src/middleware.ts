@@ -47,5 +47,11 @@ function redirectAfterLogin(role: string, req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/signin", "/admin/:path*", "/bookings/:path*", "/slots/:path*"],
+  matcher: [
+    "/signin",
+    "/admin/:path*",
+    "/bookings/:path*",
+    "/slots/:path*",
+    "/dashboard/:path*",
+  ],
 };

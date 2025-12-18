@@ -71,15 +71,13 @@ export default function SignInForm() {
       }
 
       // ✅ Redirect based on role
-      router.replace("/dashboard");
-      // const role = res.data.role;
-      // if (role === "super_admin") {
-      //   router.replace("/");
-      // } else if (role === "client_admin") {
-      //   router.replace("/dashboard");
-      // } else {
-      //   router.replace("/bookings");
-      // }
+      // router.replace("/dashboard");
+      const role = res.data.role;
+      if (role === "staff") {
+        router.replace("/bookings");
+      } else {
+        router.replace("/dashboard");
+      }
     } catch (err: any) {
       setApiError(err.message || "Login failed");
     } finally {
